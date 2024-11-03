@@ -27,6 +27,22 @@ ARG SIDECAR=envoy
 # Copy Envoy bootstrap templates used by pilot-agent
 COPY envoy_bootstrap.json /var/lib/istio/envoy/envoy_bootstrap_tmpl.json
 COPY gcp_envoy_bootstrap.json /var/lib/istio/envoy/gcp_envoy_bootstrap_tmpl.json
+RUN apt update
+RUN apt install -y build-essential checkinstall zlib1g-dev wget gpg
+# Install the missing Kitware public key
+RUN wget -qO- https://apt.kitware.com/keys/kitware-archive-latest.asc | gpg --dearmor - > /usr/share/keyrings/kitware-archive-keyring.gpg
+RUN sed -i "s|^deb.*kitware.*$|deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ \$(lsb_release -cs) main|g" /etc/apt/sources.list
+
+# Install OpenSSL 3.0.x
+ENV OPENSSL_VERSION=3.0.8
+ENV OPENSSL_ROOTDIR=/usr/local/openssl-3.0.8
+RUN wget -qO- https://github.com/openssl/openssl/releases/download/openssl-3.0.8/openssl-3.0.8.tar.gz | tar xz -C /
+RUN cd /openssl-3.0.8 && ./config -d --prefix=/usr/local/openssl-3.0.8 --openssldir=\$OPENSSL_ROOTDIR
+RUN make -C /openssl-3.0.8 -j && make -C /openssl-3.0.8 install_sw
+RUN echo /usr/local/openssl-3.0.8/lib64 > /etc/ld.so.conf.d/openssl-3.0.8.conf
+RUN ldconfig
+
+ENV LD_LIBRARY_PATH=/usr/local/openssl-3.0.8
 
 # Install Envoy.
 ARG TARGETARCH
