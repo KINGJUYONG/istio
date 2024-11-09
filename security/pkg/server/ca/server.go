@@ -76,6 +76,7 @@ func (s SaNode) String() string {
 func (s *Server) CreateCertificate(ctx context.Context, request *pb.IstioCertificateRequest) (
 	*pb.IstioCertificateResponse, error,
 ) {
+
 	s.monitoring.CSR.Increment()
 	caller, err := security.Authenticate(ctx, s.Authenticators)
 	if caller == nil || err != nil {
@@ -85,6 +86,7 @@ func (s *Server) CreateCertificate(ctx context.Context, request *pb.IstioCertifi
 
 	serverCaLog := serverCaLog.WithLabels("client", security.GetConnectionAddress(ctx))
 	// By default, we will use the callers identity for the certificate
+	serverCaLog.Infof("NOWHERE")
 	sans := caller.Identities
 	crMetadata := request.Metadata.GetFields()
 	impersonatedIdentity := crMetadata[security.ImpersonatedIdentity].GetStringValue()

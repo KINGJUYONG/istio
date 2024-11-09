@@ -213,31 +213,31 @@ func (sc *SecretManagerClient) OnSecretUpdate(resourceName string) {
 
 // getCachedSecret: retrieve cached Secret Item (workload-certificate/workload-root) from secretManager client
 func (sc *SecretManagerClient) getCachedSecret(resourceName string) (secret *security.SecretItem) {
-	var rootCertBundle []byte
-	var ns *security.SecretItem
+	// var rootCertBundle []byte // @TODO: Need to uncomment this function
+	// var ns *security.SecretItem
 
-	if c := sc.cache.GetWorkload(); c != nil {
-		if resourceName == security.RootCertReqResourceName {
-			rootCertBundle = sc.mergeTrustAnchorBytes(c.RootCert)
-			ns = &security.SecretItem{
-				ResourceName: resourceName,
-				RootCert:     rootCertBundle,
-			}
-			cacheLog.WithLabels("ttl", time.Until(c.ExpireTime)).Info("returned workload trust anchor from cache")
+	// if c := sc.cache.GetWorkload(); c != nil {
+	// 	if resourceName == security.RootCertReqResourceName {
+	// 		rootCertBundle = sc.mergeTrustAnchorBytes(c.RootCert)
+	// 		ns = &security.SecretItem{
+	// 			ResourceName: resourceName,
+	// 			RootCert:     rootCertBundle,
+	// 		}
+	// 		cacheLog.WithLabels("ttl", time.Until(c.ExpireTime)).Info("returned workload trust anchor from cache")
 
-		} else {
-			ns = &security.SecretItem{
-				ResourceName:     resourceName,
-				CertificateChain: c.CertificateChain,
-				PrivateKey:       c.PrivateKey,
-				ExpireTime:       c.ExpireTime,
-				CreatedTime:      c.CreatedTime,
-			}
-			cacheLog.WithLabels("ttl", time.Until(c.ExpireTime)).Info("returned workload certificate from cache")
-		}
+	// 	} else {
+	// 		ns = &security.SecretItem{
+	// 			ResourceName:     resourceName,
+	// 			CertificateChain: c.CertificateChain,
+	// 			PrivateKey:       c.PrivateKey,
+	// 			ExpireTime:       c.ExpireTime,
+	// 			CreatedTime:      c.CreatedTime,
+	// 		}
+	// 		cacheLog.WithLabels("ttl", time.Until(c.ExpireTime)).Info("returned workload certificate from cache")
+	// 	}
 
-		return ns
-	}
+	// 	return ns
+	// }
 	return nil
 }
 
@@ -578,10 +578,12 @@ func (sc *SecretManagerClient) generateNewSecret(resourceName string) (*security
 
 	// Generate the cert/key, send CSR to CA.
 	csrPEM, keyPEM, err := pkiutil.GenCSR(options)
+	cacheLog.Infof("GenCSR################################################## %s", options.ECSigAlg) // @TODO: This line is for debugging, remove it
 	if err != nil {
 		cacheLog.Errorf("%s failed to generate key and certificate for CSR: %v", logPrefix, err)
 		return nil, err
 	}
+	cacheLog.Infof("Done$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$$") // @TODO: This line is for debugging, remove it
 
 	numOutgoingRequests.With(RequestType.Value(monitoring.CSR)).Increment()
 	timeBeforeCSR := time.Now()

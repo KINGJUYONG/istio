@@ -116,6 +116,7 @@ func (c *CitadelClient) CSRSign(csrPEM []byte, certValidTTLInSec int64) (res []s
 
 	ctx := metadata.NewOutgoingContext(context.Background(), metadata.Pairs("ClusterID", c.opts.ClusterID))
 	resp, err := c.client.CreateCertificate(ctx, req)
+	citadelClientLog.Infof("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@") // @Todo: This line is for debugging, remove it
 	if err != nil {
 		return nil, fmt.Errorf("create certificate: %v", err)
 	}

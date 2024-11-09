@@ -26,7 +26,6 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
-	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -57,7 +56,7 @@ func GenCSR(options CertOptions) ([]byte, []byte, error) {
 				return nil, nil, fmt.Errorf("EC key generation failed (%v)", err)
 			}
 		default:
-			return nil, nil, errors.New("csr cert generation fails due to unsupported EC signature algorithm")
+			return nil, nil, fmt.Errorf("csr cert generation fails due to unsupported EC signature algorithm %s SS", options.ECSigAlg)
 		}
 	} else {
 		if options.RSAKeySize < minimumRsaKeySize {
