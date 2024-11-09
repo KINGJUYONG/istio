@@ -26,7 +26,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/structpb"
 
-	pb "istio.io/api/security/v1alpha1"
+	pb "github.com/boanlab/api/security/v1alpha1"
 	istiogrpc "istio.io/istio/pilot/pkg/grpc"
 	"istio.io/istio/pkg/log"
 	"istio.io/istio/pkg/security"
@@ -90,7 +90,10 @@ func (c *CitadelClient) CSRSign(csrPEM []byte, certValidTTLInSec int64) (res []s
 		},
 	}
 	req := &pb.IstioCertificateRequest{
-		Csr:              string(csrPEM),
+		// Below fields(SslImpl., Sig.Alg.) are NOT required in original code
+		Csr: string(csrPEM),
+		// SslImplementation:  "OSSL",
+		// SignatureAlgorithm: "SHA256WithRSA",
 		ValidityDuration: certValidTTLInSec,
 		Metadata:         crMetaStruct,
 	}
