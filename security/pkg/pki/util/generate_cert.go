@@ -48,7 +48,8 @@ type SupportedEllipticCurves string
 
 const (
 	// only ECDSA is currently supported
-	EcdsaSigAlg SupportedECSignatureAlgorithms = "Dilithium2"
+	Dilithium2SigAlg SupportedECSignatureAlgorithms = "Dilithium2"
+	EcdsaSigAlg      SupportedECSignatureAlgorithms = "ECDSA"
 
 	// supported curves when using ECC
 	P256Curve SupportedEllipticCurves = "P256"

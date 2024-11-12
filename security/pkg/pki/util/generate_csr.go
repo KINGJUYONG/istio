@@ -30,6 +30,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/open-quantum-safe/liboqs-go/oqs"
 	"istio.io/istio/pkg/log"
 )
 
@@ -41,6 +42,8 @@ const minimumRsaKeySize = 2048
 func GenCSR(options CertOptions) ([]byte, []byte, error) {
 	var priv any
 	var err error
+	var pub, csrBytes []byte
+	var signer *oqs.Signature
 	if options.ECSigAlg != "" {
 		switch options.ECSigAlg {
 		case EcdsaSigAlg:
@@ -55,6 +58,20 @@ func GenCSR(options CertOptions) ([]byte, []byte, error) {
 			if err != nil {
 				return nil, nil, fmt.Errorf("EC key generation failed (%v)", err)
 			}
+		case Dilithium2SigAlg:
+			signer = &oqs.Signature{}
+			defer signer.Clean()
+
+			if err := signer.Init(fmt.Sprintf("%s", Dilithium2SigAlg), nil); err != nil {
+				return nil, nil, fmt.Errorf("Dilithium init failed: %v", err)
+			}
+
+			pub, err = signer.GenerateKeyPair()
+			if err != nil {
+				return nil, nil, fmt.Errorf("Dilithium key generation failed: %v", err)
+			}
+
+			priv = signer
 		default:
 			return nil, nil, fmt.Errorf("csr cert generation fails due to unsupported EC signature algorithm %s SS", options.ECSigAlg)
 		}
@@ -73,9 +90,17 @@ func GenCSR(options CertOptions) ([]byte, []byte, error) {
 		return nil, nil, fmt.Errorf("CSR template creation failed (%v)", err)
 	}
 
-	csrBytes, err := x509.CreateCertificateRequest(rand.Reader, template, crypto.PrivateKey(priv))
-	if err != nil {
-		return nil, nil, fmt.Errorf("CSR creation failed (%v)", err)
+	switch options.ECSigAlg {
+	case Dilithium2SigAlg:
+		csrBytes, err = createOQSCertificateRequest(rand.Reader, template, pub, signer)
+		if err != nil {
+			return nil, nil, fmt.Errorf("CSR creation failed (%v)", err)
+		}
+	default:
+		csrBytes, err = x509.CreateCertificateRequest(rand.Reader, template, crypto.PrivateKey(priv))
+		if err != nil {
+			return nil, nil, fmt.Errorf("CSR creation failed (%v)", err)
+		}
 	}
 
 	csr, privKey, err := encodePem(true, csrBytes, priv, options.PKCS8Key)

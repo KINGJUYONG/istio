@@ -49,7 +49,7 @@ func TestGenCSR(t *testing.T) {
 			csrOptions: CertOptions{
 				Host:     "test_ca.com",
 				Org:      "MyOrg",
-				ECSigAlg: "ED25519",
+				ECSigAlg: Dilithium2SigAlg,
 			},
 			err: errors.New("csr cert generation fails due to unsupported EC signature algorithm"),
 		},
