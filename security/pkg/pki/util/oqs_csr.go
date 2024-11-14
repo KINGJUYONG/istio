@@ -4,16 +4,15 @@ import (
 	"crypto/x509"
 	"crypto/x509/pkix"
 	"encoding/asn1"
-	"io"
 	"math/big"
 	"time"
 
 	"github.com/open-quantum-safe/liboqs-go/oqs"
 )
 
-func createOQSCertificateRequest(rand io.Reader, template *x509.CertificateRequest, publicKeyBytes []byte, signer *oqs.Signature) (csr []byte, err error) {
+func createOQSCertificateRequest(template *x509.CertificateRequest, publicKeyBytes []byte, signer *oqs.Signature) (csr []byte, err error) {
 	publicKeyAlgorithm := pkix.AlgorithmIdentifier{
-		Algorithm:  asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 772, 1, 2}, // Dilithum OID
+		Algorithm:  asn1.ObjectIdentifier{1, 3, 6, 1, 4, 1, 772, 1, 2}, // Dilithum2 OID
 		Parameters: asn1.RawValue{FullBytes: []byte{5, 0}},
 	}
 
@@ -59,6 +58,8 @@ func createOQSCertificateRequest(rand io.Reader, template *x509.CertificateReque
 			BitLength: len(signature) * 8,
 		},
 	})
+
+	return csr, nil
 }
 
 type certificateRequest struct {

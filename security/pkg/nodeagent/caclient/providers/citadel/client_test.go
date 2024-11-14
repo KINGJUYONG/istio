@@ -32,7 +32,7 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	pb "istio.io/api/security/v1alpha1"
+	pb "github.com/boanlab/api/security/v1alpha1"
 	testutil "istio.io/istio/pilot/test/util"
 	"istio.io/istio/pkg/config/constants"
 	"istio.io/istio/pkg/file"

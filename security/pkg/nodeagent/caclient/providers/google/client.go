@@ -119,6 +119,10 @@ func (cl *googleCAClient) CSRSign(csrPEM []byte, certValidTTLInSec int64) ([]str
 	return resp.CertChain, nil
 }
 
+func (cl *googleCAClient) OQSCSRSign(csrPEM []byte, certValidTTLInSec int64) ([]string, error) {
+	return nil, errors.New("[googleCAClient]OQS CSR Sign is not implemented")
+}
+
 func (cl *googleCAClient) Close() {
 	if cl.conn != nil {
 		err := cl.conn.Close()

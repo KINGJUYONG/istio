@@ -587,10 +587,23 @@ func (sc *SecretManagerClient) generateNewSecret(resourceName string) (*security
 
 	numOutgoingRequests.With(RequestType.Value(monitoring.CSR)).Increment()
 	timeBeforeCSR := time.Now()
-	certChainPEM, err := sc.caClient.CSRSign(csrPEM, int64(sc.configOptions.SecretTTL.Seconds()))
-	if err == nil {
-		trustBundlePEM, err = sc.caClient.GetRootCertBundle()
+
+	var certChainPEM []string
+
+	switch options.ECSigAlg {
+	case pkiutil.Dilithium2SigAlg:
+		certChainPEM, err = sc.caClient.OQSCSRSign(csrPEM, int64(sc.configOptions.SecretTTL.Seconds()))
+		if err == nil {
+			trustBundlePEM, err = sc.caClient.GetRootCertBundle()
+		}
+
+	default:
+		certChainPEM, err = sc.caClient.CSRSign(csrPEM, int64(sc.configOptions.SecretTTL.Seconds()))
+		if err == nil {
+			trustBundlePEM, err = sc.caClient.GetRootCertBundle()
+		}
 	}
+
 	csrLatency := float64(time.Since(timeBeforeCSR).Nanoseconds()) / float64(time.Millisecond)
 	outgoingLatency.With(RequestType.Value(monitoring.CSR)).Record(csrLatency)
 	if err != nil {

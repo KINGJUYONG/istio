@@ -253,6 +253,16 @@ func GenCertFromCSR(csr *x509.CertificateRequest, signingCert *x509.Certificate,
 	return x509.CreateCertificate(rand.Reader, tmpl, signingCert, publicKey, signingKey)
 }
 
+func GenOQSCertFromCSR(csr *x509.CertificateRequest, signingCert *x509.Certificate, publicKey any,
+	signingKey crypto.PrivateKey, subjectIDs []string, ttl time.Duration, isCA bool,
+) (cert []byte, err error) {
+	tmpl, err := genCertTemplateFromCSR(csr, subjectIDs, ttl, isCA)
+	if err != nil {
+		return nil, err
+	}
+	return CreateCertificateWithOQS(rand.Reader, tmpl, signingCert, publicKey, signingKey)
+}
+
 // LoadSignerCredsFromFiles loads the signer cert&key from the given files.
 //
 //	signerCertFile: cert file name

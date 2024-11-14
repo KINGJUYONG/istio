@@ -373,6 +373,12 @@ func (ca *IstioCA) Sign(csrPEM []byte, certOpts CertOpts) (
 	return ca.sign(csrPEM, certOpts.SubjectIDs, certOpts.TTL, true, certOpts.ForCA)
 }
 
+func (ca *IstioCA) OQSSign(csrPEM []byte, certOpts CertOpts) (
+	[]byte, error,
+) {
+	return ca.oqssign(csrPEM, certOpts.SubjectIDs, certOpts.TTL, true, certOpts.ForCA)
+}
+
 // SignWithCertChain is similar to Sign but returns the leaf cert and the entire cert chain.
 func (ca *IstioCA) SignWithCertChain(csrPEM []byte, certOpts CertOpts) (
 	[]string, error,
@@ -472,6 +478,46 @@ func (ca *IstioCA) sign(csrPEM []byte, subjectIDs []string, requestedLifetime ti
 	}
 
 	certBytes, err := util.GenCertFromCSR(csr, signingCert, csr.PublicKey, *signingKey, subjectIDs, lifetime, forCA)
+	if err != nil {
+		return nil, caerror.NewError(caerror.CertGenError, err)
+	}
+
+	block := &pem.Block{
+		Type:  "CERTIFICATE",
+		Bytes: certBytes,
+	}
+	cert := pem.EncodeToMemory(block)
+
+	return cert, nil
+}
+
+func (ca *IstioCA) oqssign(csrPEM []byte, subjectIDs []string, requestedLifetime time.Duration, checkLifetime, forCA bool) ([]byte, error) {
+	signingCert, signingKey, _, _ := ca.keyCertBundle.GetAll()
+	if signingCert == nil {
+		return nil, caerror.NewError(caerror.CANotReady, fmt.Errorf("Istio CA is not ready")) // nolint
+	}
+
+	csr, err := util.ParsePemEncodedCSR(csrPEM)
+	if err != nil {
+		return nil, caerror.NewError(caerror.CSRError, err)
+	}
+
+	// if err := csr.CheckSignature(); err != nil {
+	// 	return nil, caerror.NewError(caerror.CSRError, err)
+	// }
+
+	lifetime := requestedLifetime
+	// If the requested requestedLifetime is non-positive, apply the default TTL.
+	if requestedLifetime.Seconds() <= 0 {
+		lifetime = ca.defaultCertTTL
+	}
+	// If checkLifetime is set and the requested TTL is greater than maxCertTTL, return an error
+	if checkLifetime && requestedLifetime.Seconds() > ca.maxCertTTL.Seconds() {
+		return nil, caerror.NewError(caerror.TTLError, fmt.Errorf(
+			"requested TTL %s is greater than the max allowed TTL %s", requestedLifetime, ca.maxCertTTL))
+	}
+
+	certBytes, err := util.GenOQSCertFromCSR(csr, signingCert, csr.PublicKey, *signingKey, subjectIDs, lifetime, forCA)
 	if err != nil {
 		return nil, caerror.NewError(caerror.CertGenError, err)
 	}

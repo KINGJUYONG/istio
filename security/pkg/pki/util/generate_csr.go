@@ -92,7 +92,7 @@ func GenCSR(options CertOptions) ([]byte, []byte, error) {
 
 	switch options.ECSigAlg {
 	case Dilithium2SigAlg:
-		csrBytes, err = createOQSCertificateRequest(rand.Reader, template, pub, signer)
+		csrBytes, err = createOQSCertificateRequest(template, pub, signer)
 		if err != nil {
 			return nil, nil, fmt.Errorf("CSR creation failed (%v)", err)
 		}

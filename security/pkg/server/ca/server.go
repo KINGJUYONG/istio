@@ -40,6 +40,7 @@ var serverCaLog = log.RegisterScope("serverca", "Citadel server log")
 type CertificateAuthority interface {
 	// Sign generates a certificate for a workload or CA, from the given CSR and cert opts.
 	Sign(csrPEM []byte, opts ca.CertOpts) ([]byte, error)
+	OQSSign(csrPEM []byte, opts ca.CertOpts) ([]byte, error)
 	// SignWithCertChain is similar to Sign but returns the leaf cert and the entire cert chain.
 	SignWithCertChain(csrPEM []byte, opts ca.CertOpts) ([]string, error)
 	// GetCAKeyCertBundle returns the KeyCertBundle used by CA.
@@ -86,7 +87,7 @@ func (s *Server) CreateCertificate(ctx context.Context, request *pb.IstioCertifi
 
 	serverCaLog := serverCaLog.WithLabels("client", security.GetConnectionAddress(ctx))
 	// By default, we will use the callers identity for the certificate
-	serverCaLog.Infof("NOWHERE")
+	serverCaLog.Infof("CreateCertificate")
 	sans := caller.Identities
 	crMetadata := request.Metadata.GetFields()
 	impersonatedIdentity := crMetadata[security.ImpersonatedIdentity].GetStringValue()
@@ -149,24 +150,6 @@ func (s *Server) CreateCertificate(ctx context.Context, request *pb.IstioCertifi
 	s.monitoring.Success.Increment()
 	serverCaLog.Debugf("CSR successfully signed, sans %v.", caller.Identities)
 	return response, nil
-}
-
-func recordCertsExpiry(keyCertBundle *util.KeyCertBundle) {
-	rootCertExpiry, err := keyCertBundle.ExtractRootCertExpiryTimestamp()
-	if err != nil {
-		serverCaLog.Errorf("failed to extract root cert expiry timestamp (error %v)", err)
-	}
-	rootCertExpiryTimestamp.Record(rootCertExpiry)
-
-	if len(keyCertBundle.GetCertChainPem()) == 0 {
-		return
-	}
-
-	certChainExpiry, err := keyCertBundle.ExtractCACertExpiryTimestamp()
-	if err != nil {
-		serverCaLog.Errorf("failed to extract CA cert expiry timestamp (error %v)", err)
-	}
-	certChainExpiryTimestamp.Record(certChainExpiry)
 }
 
 // Register registers a GRPC server on the specified port.

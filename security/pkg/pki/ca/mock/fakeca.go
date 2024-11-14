@@ -15,6 +15,8 @@
 package mock
 
 import (
+	"fmt"
+
 	"istio.io/istio/security/pkg/pki/ca"
 	caerror "istio.io/istio/security/pkg/pki/error"
 	"istio.io/istio/security/pkg/pki/util"
@@ -35,6 +37,12 @@ func (ca *FakeCA) Sign(csr []byte, certOpts ca.CertOpts) ([]byte, error) {
 		return nil, ca.SignErr
 	}
 	return ca.SignedCert, nil
+}
+
+func (ca *FakeCA) OQSSign(csrPEM []byte, certOpts ca.CertOpts) (
+	[]byte, error,
+) {
+	return nil, fmt.Errorf("OQS signing is not supported by Kubernetes RA")
 }
 
 // SignWithCertChain returns the SignErr if SignErr is not nil, otherwise, it returns SignedCert and the cert chain.

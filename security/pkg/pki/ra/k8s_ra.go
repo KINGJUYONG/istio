@@ -43,6 +43,13 @@ type KubernetesRA struct {
 	mutex sync.RWMutex
 }
 
+// OQSSign implements RegistrationAuthority.
+func (r *KubernetesRA) OQSSign(csrPEM []byte, certOpts ca.CertOpts) (
+	[]byte, error,
+) {
+	return nil, fmt.Errorf("OQS signing is not supported by Kubernetes RA")
+}
+
 var pkiRaLog = log.RegisterScope("pkira", "Istiod RA log")
 
 // NewKubernetesRA : Create a RA that interfaces with K8S CSR CA

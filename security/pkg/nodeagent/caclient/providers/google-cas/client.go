@@ -138,6 +138,10 @@ func (r *GoogleCASClient) GetRootCertBundle() ([]string, error) {
 	return sets.SortedList(rootCertSet), nil
 }
 
+func (r *GoogleCASClient) OQSCSRSign(csrPEM []byte, certValidTTLInSec int64) ([]string, error) {
+	return nil, fmt.Errorf("[GoogleCASClient]OQS CSR Sign is not implemented")
+}
+
 func (r *GoogleCASClient) Close() {
 	_ = r.caClient.Close()
 }

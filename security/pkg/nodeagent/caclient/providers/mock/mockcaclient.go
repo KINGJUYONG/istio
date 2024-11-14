@@ -16,6 +16,7 @@ package mock
 
 import (
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"path"
 	"sync/atomic"
@@ -85,6 +86,10 @@ func (c *CAClient) CSRSign(csrPEM []byte, certValidTTLInSec int64) ([]string, er
 	ret := []string{string(cert), string(certChain), string(rootCert)}
 	c.GeneratedCerts = append(c.GeneratedCerts, ret)
 	return ret, nil
+}
+
+func (c *CAClient) OQSCSRSign(csrPEM []byte, certValidTTLInSec int64) ([]string, error) {
+	return nil, errors.New("[googleCAClient]OQS CSR Sign is not implemented")
 }
 
 func (c *CAClient) GetRootCertBundle() ([]string, error) {

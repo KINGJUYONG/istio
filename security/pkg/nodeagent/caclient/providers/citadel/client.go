@@ -128,6 +128,49 @@ func (c *CitadelClient) CSRSign(csrPEM []byte, certValidTTLInSec int64) (res []s
 	return resp.CertChain, nil
 }
 
+func (c *CitadelClient) OQSCSRSign(csrPEM []byte, certValidTTLInSec int64) (res []string, err error) {
+	crMetaStruct := &structpb.Struct{
+		Fields: map[string]*structpb.Value{
+			security.CertSigner: {
+				Kind: &structpb.Value_StringValue{StringValue: c.opts.CertSigner},
+			},
+		},
+	}
+	req := &pb.IstioCertificateRequest{
+		// Below fields(SslImpl., Sig.Alg.) are NOT required in original code
+		Csr: string(csrPEM),
+		// SslImplementation:  "OSSL",
+		// SignatureAlgorithm: "SHA256WithRSA",
+		ValidityDuration: certValidTTLInSec,
+		Metadata:         crMetaStruct,
+	}
+
+	defer func() {
+		if err != nil && strings.Contains(err.Error(), "x509: certificate signed by unknown authority") {
+			if err := c.reconnect(); err != nil {
+				citadelClientLog.Errorf("failed reconnect: %v", err)
+			}
+		}
+	}()
+
+	if err = c.reconnectIfNeeded(); err != nil {
+		return nil, err
+	}
+
+	ctx := metadata.NewOutgoingContext(context.Background(), metadata.Pairs("ClusterID", c.opts.ClusterID))
+	resp, err := c.client.CreateOQSCertificate(ctx, req)
+	citadelClientLog.Infof("@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@") // @Todo: This line is for debugging, remove it
+	if err != nil {
+		return nil, fmt.Errorf("create certificate: %v", err)
+	}
+
+	if len(resp.CertChain) <= 1 {
+		return nil, errors.New("invalid empty CertChain")
+	}
+
+	return resp.CertChain, nil
+}
+
 func (c *CitadelClient) getTLSOptions() *istiogrpc.TLSOptions {
 	if c.tlsOpts != nil {
 		return &istiogrpc.TLSOptions{

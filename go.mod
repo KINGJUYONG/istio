@@ -20,7 +20,7 @@ require (
 	github.com/Masterminds/semver/v3 v3.2.1
 	github.com/Masterminds/sprig/v3 v3.2.3
 	github.com/alecholmes/xfccparser v0.1.0
-	github.com/boanlab/api v0.0.0-20241108164029-a2b92ec4693b
+	github.com/boanlab/api v0.0.0-20241112182754-d77eca88908a
 	github.com/cenkalti/backoff/v4 v4.2.1
 	github.com/census-instrumentation/opencensus-proto v0.4.1
 	github.com/cespare/xxhash/v2 v2.2.0
@@ -66,6 +66,7 @@ require (
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/moby/buildkit v0.12.5
 	github.com/onsi/gomega v1.27.10
+	github.com/open-quantum-safe/liboqs-go v0.0.0-20240412174151-8a109c3b4878
 	github.com/openshift/api v0.0.0-20230823114715-5fdd7511b790
 	github.com/pires/go-proxyproto v0.7.0
 	github.com/pmezard/go-difflib v1.0.1-0.20181226105442-5d4384ee4fb2
@@ -210,7 +211,6 @@ require (
 	github.com/monochromegane/go-gitignore v0.0.0-20200626010858-205db1a8cc00 // indirect
 	github.com/munnerz/goautoneg v0.0.0-20191010083416-a7dc8b61c822 // indirect
 	github.com/onsi/ginkgo/v2 v2.11.0 // indirect
-	github.com/open-quantum-safe/liboqs-go v0.0.0-20240412174151-8a109c3b4878 // indirect
 	github.com/opencontainers/go-digest v1.0.0 // indirect
 	github.com/opencontainers/image-spec v1.1.0-rc3 // indirect
 	github.com/pelletier/go-toml/v2 v2.0.8 // indirect

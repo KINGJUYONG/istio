@@ -120,8 +120,10 @@ github.com/bgentry/speakeasy v0.1.0/go.mod h1:+zsyZBPWlz7T6j88CTgSN5bM796AkVf0kB
 github.com/blang/semver v3.5.0+incompatible/go.mod h1:kRBLl5iJ+tD4TcOOxsy/0fnwebNt5EWlYSAyrTnjyyk=
 github.com/blang/semver/v4 v4.0.0 h1:1PFHFE6yCCTv8C1TeyNNarDzntLi7wMI5i/pzqYIsAM=
 github.com/blang/semver/v4 v4.0.0/go.mod h1:IbckMUScFkM3pff0VJDNKRiT6TG/YpiHIM2yvyW5YoQ=
-github.com/boanlab/api v0.0.0-20241108164029-a2b92ec4693b h1:WjuB4MvzziKDW5PKX8jNIGrbTNj9eniA4FGwaXVf1cs=
-github.com/boanlab/api v0.0.0-20241108164029-a2b92ec4693b/go.mod h1:UgI+nT1385xoo74qXvf9VHvopSEClLUjboukMwN5NUQ=
+github.com/boanlab/api v0.0.0-20241112175229-fe499154d7a3 h1:gI05sKPoGCgKpR7zIxB1BN31opCX/z2Uhr0Hf9AOn1g=
+github.com/boanlab/api v0.0.0-20241112175229-fe499154d7a3/go.mod h1:UgI+nT1385xoo74qXvf9VHvopSEClLUjboukMwN5NUQ=
+github.com/boanlab/api v0.0.0-20241112182754-d77eca88908a h1:EJLLycNwUP7CPnX3Rf4W7X8FS0rqj2ejLezJCQDcjts=
+github.com/boanlab/api v0.0.0-20241112182754-d77eca88908a/go.mod h1:UgI+nT1385xoo74qXvf9VHvopSEClLUjboukMwN5NUQ=
 github.com/cenkalti/backoff/v4 v4.2.1 h1:y4OZtCnogmCPw98Zjyt5a6+QwPLGkiQsYW5oUqylYbM=
 github.com/cenkalti/backoff/v4 v4.2.1/go.mod h1:Y3VNntkOUPxTVeUxJ/G5vcM//AlwfmyYozVcomhLiZE=
 github.com/census-instrumentation/opencensus-proto v0.2.1/go.mod h1:f6KPmirojxKA12rnyqOA5BBL4O983OfeGPqjHWSTneU=
