@@ -3,10 +3,10 @@ package ca
 import (
 	"time"
 
+	pb "github.com/boanlab/api/security/v1alpha1"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	pb "istio.io/api/security/v1alpha1"
 	"istio.io/istio/pkg/security"
 	"istio.io/istio/security/pkg/pki/ca"
 	caerror "istio.io/istio/security/pkg/pki/error"

@@ -458,6 +458,8 @@ func encodePem(isCSR bool, csrOrCert []byte, priv any, pkcs8 bool) (
 				return nil, nil, err
 			}
 			privPem = pem.EncodeToMemory(&pem.Block{Type: blockTypeECPrivateKey, Bytes: encodedKey})
+		default:
+			return nil, nil, fmt.Errorf("unsupported private key type: %T", priv)
 		}
 	}
 	err = nil

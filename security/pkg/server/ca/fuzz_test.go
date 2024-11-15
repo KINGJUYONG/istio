@@ -19,7 +19,7 @@ import (
 	"fmt"
 	"testing"
 
-	pb "istio.io/api/security/v1alpha1"
+	pb "github.com/boanlab/api/security/v1alpha1"
 	"istio.io/istio/pkg/fuzz"
 	"istio.io/istio/pkg/security"
 	mockca "istio.io/istio/security/pkg/pki/ca/mock"

@@ -23,6 +23,11 @@
 
 # This script builds and version stamps the output
 
+export LD_LIBRARY_PATH=/work/oqs/liboqs/lib
+export PKG_CONFIG_PATH=/work/oqs/liboqs-go/.config
+export CGO_LDFLAGS="-L/work/oqs/liboqs/lib -loqs"
+export CGO_CFLAGS="-I/work/oqs/liboqs/include"
+
 VERBOSE=${VERBOSE:-"0"}
 V=""
 if [[ "${VERBOSE}" == "1" ]];then
@@ -42,14 +47,14 @@ export BUILD_GOARCH=${GOARCH:-amd64}
 GOBINARY=${GOBINARY:-go}
 GOPKG="$GOPATH/pkg"
 BUILDINFO=${BUILDINFO:-""}
-STATIC=${STATIC:-1}
-LDFLAGS=${LDFLAGS:--extldflags -static}
+STATIC=${STATIC:-0} # 
+LDFLAGS=${LDFLAGS:--L/work/liboqs/build/lib -loqs} #
 GOBUILDFLAGS=${GOBUILDFLAGS:-""}
 # Split GOBUILDFLAGS by spaces into an array called GOBUILDFLAGS_ARRAY.
 IFS=' ' read -r -a GOBUILDFLAGS_ARRAY <<< "$GOBUILDFLAGS"
 
 GCFLAGS=${GCFLAGS:-}
-export CGO_ENABLED=${CGO_ENABLED:-0}
+export CGO_ENABLED=${CGO_ENABLED:-1} #
 
 if [[ "${STATIC}" !=  "1" ]];then
     LDFLAGS=""

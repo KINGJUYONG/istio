@@ -23,26 +23,63 @@ WORKDIR /
 
 ARG proxy_version
 ARG SIDECAR=envoy
+ARG SIDECAR_LIBRARY=libbssl-compat.so
 
 # Copy Envoy bootstrap templates used by pilot-agent
 COPY envoy_bootstrap.json /var/lib/istio/envoy/envoy_bootstrap_tmpl.json
 COPY gcp_envoy_bootstrap.json /var/lib/istio/envoy/gcp_envoy_bootstrap_tmpl.json
-RUN apt update
-RUN apt install -y build-essential checkinstall zlib1g-dev wget gpg
+RUN apt update && apt install -y build-essential checkinstall zlib1g-dev wget gpg cmake
 # Install the missing Kitware public key
 RUN wget -qO- https://apt.kitware.com/keys/kitware-archive-latest.asc | gpg --dearmor - > /usr/share/keyrings/kitware-archive-keyring.gpg
 RUN sed -i "s|^deb.*kitware.*$|deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ \$(lsb_release -cs) main|g" /etc/apt/sources.list
 
-# Install OpenSSL 3.0.x
-ENV OPENSSL_VERSION=3.0.8
-ENV OPENSSL_ROOTDIR=/usr/local/openssl-3.0.8
-RUN wget -qO- https://github.com/openssl/openssl/releases/download/openssl-3.0.8/openssl-3.0.8.tar.gz | tar xz -C /
-RUN cd /openssl-3.0.8 && ./config -d --prefix=/usr/local/openssl-3.0.8 --openssldir=\$OPENSSL_ROOTDIR
-RUN make -C /openssl-3.0.8 -j && make -C /openssl-3.0.8 install_sw
-RUN echo /usr/local/openssl-3.0.8/lib64 > /etc/ld.so.conf.d/openssl-3.0.8.conf
-RUN ldconfig
+# Install OpenSSL 3.2.0
+ENV OPENSSL_VERSION=3.2.0 \
+    OPENSSL_ROOTDIR=/usr/local/openssl-3.2.0
+RUN wget -qO- https://github.com/openssl/openssl/releases/download/openssl-3.2.0/openssl-3.2.0.tar.gz | tar xz -C / && \
+    cd /openssl-3.2.0 && \
+    ./config -d --prefix=/usr/local/openssl-3.2.0 --openssldir=$OPENSSL_ROOTDIR && \
+    make -j && make install_sw install_ssldirs && \
+    echo /usr/local/openssl-3.2.0/lib64 > /etc/ld.so.conf.d/openssl-3.2.0.conf && \
+    ldconfig
 
-ENV LD_LIBRARY_PATH=/usr/local/openssl-3.0.8
+ENV LD_LIBRARY_PATH=/usr/local/openssl-3.2.0/lib64:$LD_LIBRARY_PATH
+
+# Install libOQS
+RUN cd / && \
+    wget --no-check-certificate https://github.com/open-quantum-safe/liboqs/archive/refs/tags/0.11.0.tar.gz && \
+    tar xzf 0.11.0.tar.gz && \
+    rm 0.11.0.tar.gz && \
+    cd /liboqs-0.11.0 && \
+    mkdir build && \
+    cd build && \
+    cmake \
+        -DCMAKE_INSTALL_PREFIX=$OPENSSL_ROOTDIR \
+        -DBUILD_SHARED_LIBS=ON \
+        -DOQS_USE_OPENSSL=OFF \
+        -DCMAKE_BUILD_TYPE=Release \
+        -DOQS_BUILD_ONLY_LIB=ON \
+        -DOQS_DIST_BUILD=ON \
+        -DCMAKE_INSTALL_LIBDIR=lib64 \
+        .. && \
+    make -j && make install
+
+# Install oqsprovider
+RUN wget --no-check-certificate https://github.com/open-quantum-safe/oqs-provider/archive/refs/tags/0.7.0.tar.gz && \
+    tar xzf 0.7.0.tar.gz && \
+    rm 0.7.0.tar.gz && \
+    cd /oqs-provider-0.7.0 && \
+    mkdir build && \
+    cd build && \
+    cmake -DOPENSSL_ROOT_DIR=$OPENSSL_ROOTDIR \
+        -DCMAKE_PREFIX_PATH=$OPENSSL_ROOTDIR \
+        -Dliboqs_DIR=$OPENSSL_ROOTDIR/lib64/cmake/liboqs \
+        .. && \
+    make -j && make install && \
+    sed -i "s/default = default_sect/default = default_sect\noqsprovider = oqsprovider_sect/g" $OPENSSL_ROOTDIR/openssl.cnf && \
+    sed -i "s/\[default_sect\]/\[default_sect\]\nactivate = 1\n\[oqsprovider_sect\]\nactivate = 1\n/g" $OPENSSL_ROOTDIR/openssl.cnf
+
+ENV OPENSSL_CONF=$OPENSSL_ROOTDIR/openssl.cnf
 
 # Install Envoy.
 ARG TARGETARCH

@@ -49,4 +49,7 @@ service MeshCertificateService {
   rpc CreateCertificate(MeshCertificateRequest)
     returns (MeshCertificateResponse) {
   }
+  rpc CreateOQSCertificate(MeshCertificateRequest)
+    returns (MeshCertificateResponse) {
+  }
 }

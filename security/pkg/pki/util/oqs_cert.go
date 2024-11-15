@@ -8,6 +8,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/asn1"
 	"errors"
+	"fmt"
 	"io"
 
 	"github.com/open-quantum-safe/liboqs-go/oqs"
@@ -46,9 +47,20 @@ func (k *OQSPrivateKey) Sign(rand io.Reader, digest []byte, opts crypto.SignerOp
 
 func CreateCertificateWithOQS(rand io.Reader, template, parent *x509.Certificate, pub, priv any) ([]byte, error) {
 	// Verify that we're using an OQS private key
-	oqsKey, isOQS := priv.(*OQSPrivateKey)
-	if !isOQS {
-		return nil, errors.New("x509: expected OQS private key")
+	var oqsKey *OQSPrivateKey
+	var algorithm string
+
+	switch k := priv.(type) {
+	case *OQSPrivateKey:
+		oqsKey = k
+		// algorithm = k.Algorithm
+	case oqs.Signature:
+		oqsKey = &OQSPrivateKey{Sig: &k}
+		return nil, fmt.Errorf("x509: oqs.Signature: %T", priv)
+	case crypto.PrivateKey:
+		return nil, fmt.Errorf("x509: crypto.PrivateKey: %T", priv)
+	default:
+		return nil, fmt.Errorf("x509: (%s / %s)unsupported private key type: %T", k, algorithm, priv)
 	}
 
 	if template.SerialNumber == nil {

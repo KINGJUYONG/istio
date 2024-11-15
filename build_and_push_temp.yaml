@@ -1,0 +1,13 @@
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+spec:
+  profile: default
+  hub: docker.io/boanlab
+  tag: customca_test42
+  meshConfig:
+    # meshMTLS:
+    #   cipherSuites:
+    #   - TLS_AES_128_GCM_SHA256
+    defaultConfig:
+      proxyMetadata:
+        ECC_SIGNATURE_ALGORITHM: "Dilithium2"

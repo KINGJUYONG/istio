@@ -23,7 +23,7 @@ import (
 	"google.golang.org/grpc/status"
 	"k8s.io/apimachinery/pkg/types"
 
-	pb "istio.io/api/security/v1alpha1"
+	pb "github.com/boanlab/api/security/v1alpha1"
 	"istio.io/istio/pilot/pkg/features"
 	"istio.io/istio/pkg/kube"
 	"istio.io/istio/pkg/kube/namespace"
@@ -87,7 +87,7 @@ func (s *Server) CreateCertificate(ctx context.Context, request *pb.IstioCertifi
 
 	serverCaLog := serverCaLog.WithLabels("client", security.GetConnectionAddress(ctx))
 	// By default, we will use the callers identity for the certificate
-	serverCaLog.Infof("CreateCertificate")
+	serverCaLog.Infof("CreateCertificate") // @TODO remove
 	sans := caller.Identities
 	crMetadata := request.Metadata.GetFields()
 	impersonatedIdentity := crMetadata[security.ImpersonatedIdentity].GetStringValue()

@@ -457,6 +457,8 @@ func (ca *IstioCA) sign(csrPEM []byte, subjectIDs []string, requestedLifetime ti
 		return nil, caerror.NewError(caerror.CANotReady, fmt.Errorf("Istio CA is not ready")) // nolint
 	}
 
+	pkiCaLog.Infof("(Origin)signingKey %v", signingKey) // @TODO remove
+
 	csr, err := util.ParsePemEncodedCSR(csrPEM)
 	if err != nil {
 		return nil, caerror.NewError(caerror.CSRError, err)
@@ -496,6 +498,8 @@ func (ca *IstioCA) oqssign(csrPEM []byte, subjectIDs []string, requestedLifetime
 	if signingCert == nil {
 		return nil, caerror.NewError(caerror.CANotReady, fmt.Errorf("Istio CA is not ready")) // nolint
 	}
+
+	pkiCaLog.Infof("(OQS)signingKey %v", signingKey) // @TODO remove
 
 	csr, err := util.ParsePemEncodedCSR(csrPEM)
 	if err != nil {

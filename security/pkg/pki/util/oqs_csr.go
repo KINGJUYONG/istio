@@ -58,8 +58,6 @@ func createOQSCertificateRequest(template *x509.CertificateRequest, publicKeyByt
 			BitLength: len(signature) * 8,
 		},
 	})
-
-	return csr, nil
 }
 
 type certificateRequest struct {

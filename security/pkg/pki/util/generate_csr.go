@@ -73,7 +73,7 @@ func GenCSR(options CertOptions) ([]byte, []byte, error) {
 
 			priv = signer
 		default:
-			return nil, nil, fmt.Errorf("csr cert generation fails due to unsupported EC signature algorithm %s SS", options.ECSigAlg)
+			return nil, nil, fmt.Errorf("csr cert generation fails due to unsupported EC signature algorithm %s SS %s ", options.ECSigAlg, Dilithium2SigAlg)
 		}
 	} else {
 		if options.RSAKeySize < minimumRsaKeySize {

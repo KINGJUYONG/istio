@@ -27,7 +27,7 @@ import (
 	ghc "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/status"
 
-	pb "istio.io/api/security/v1alpha1"
+	pb "github.com/boanlab/api/security/v1alpha1"
 	"istio.io/istio/pkg/log"
 	"istio.io/istio/pkg/security"
 	"istio.io/istio/pkg/spiffe"
