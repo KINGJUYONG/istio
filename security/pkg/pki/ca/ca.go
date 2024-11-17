@@ -29,6 +29,7 @@ import (
 	corev1 "k8s.io/client-go/kubernetes/typed/core/v1"
 
 	"istio.io/istio/pkg/backoff"
+	"istio.io/istio/pkg/env"
 	"istio.io/istio/pkg/log"
 	"istio.io/istio/security/pkg/cmd"
 	caerror "istio.io/istio/security/pkg/pki/error"
@@ -121,6 +122,11 @@ func NewSelfSignedIstioCAOptions(ctx context.Context,
 	maxCertTTL time.Duration, org string, useCacertsSecretName, dualUse bool, namespace string, client corev1.CoreV1Interface,
 	rootCertFile string, enableJitter bool, caRSAKeySize int,
 ) (caOpts *IstioCAOptions, err error) {
+	// Check if OQS should be used
+	oqsAlgorithm := env.Register("ECC_SIGNATURE_ALGORITHM", "",
+		"OQS signature algorithm to use (e.g., 'Dilithium2'). If empty, use traditional RSA/ECDSA.").Get()
+	useOQS := oqsAlgorithm != ""
+
 	caOpts = &IstioCAOptions{
 		CAType:         selfSignedCA,
 		DefaultCertTTL: defaultCertTTL,
@@ -140,32 +146,50 @@ func NewSelfSignedIstioCAOptions(ctx context.Context,
 		},
 	}
 
-	// always use ``istio-ca-secret` in priority, otherwise fall back to `cacerts`
 	var caCertName string
 	b := backoff.NewExponentialBackOff(backoff.DefaultOption())
 	err = b.RetryWithContext(ctx, func() error {
 		caCertName = CASecret
-		// 1. fetch `istio-ca-secret` in priority
-		err := loadSelfSignedCaSecret(client, namespace, caCertName, rootCertFile, caOpts)
-		if err == nil {
-			return nil
-		} else if apierror.IsNotFound(err) {
-			// 2. if `istio-ca-secret` not exist and use cacerts enabled, fallback to fetch `cacerts`
-			if useCacertsSecretName {
-				caCertName = CACertsSecret
-				err := loadSelfSignedCaSecret(client, namespace, caCertName, rootCertFile, caOpts)
-				if err == nil {
-					return nil
-				} else if apierror.IsNotFound(err) { // if neither `istio-ca-secret` nor `cacerts` exists, we create a `cacerts`
-					// continue to create `cacerts`
-				} else {
-					return err
+		pkiCaLog.Infof("(@@@@@)Checking existing CASecret %s", oqsAlgorithm)
+		// Only check existing secrets if not using OQS
+		if !useOQS {
+			// 1. fetch `istio-ca-secret` in priority
+			err := loadSelfSignedCaSecret(client, namespace, caCertName, rootCertFile, caOpts)
+			if err == nil {
+				return nil
+			} else if apierror.IsNotFound(err) {
+				// 2. if `istio-ca-secret` not exist and use cacerts enabled, fallback to fetch `cacerts`
+				if useCacertsSecretName {
+					caCertName = CACertsSecret
+					err := loadSelfSignedCaSecret(client, namespace, caCertName, rootCertFile, caOpts)
+					if err == nil {
+						return nil
+					} else if !apierror.IsNotFound(err) {
+						return err
+					}
 				}
+			} else {
+				return err
 			}
+		}
 
-			// 3. if use cacerts disabled, create `istio-ca-secret`, otherwise create `cacerts`.
-			pkiCaLog.Infof("CASecret %s not found, will create one", caCertName)
-			options := util.CertOptions{
+		// Create new secret for OQS mode or when no existing secret was found
+		pkiCaLog.Infof("Creating new CASecret %s", caCertName)
+
+		var options util.CertOptions
+		if useOQS {
+			options = util.CertOptions{
+				TTL:          caCertTTL,
+				Org:          org,
+				IsCA:         true,
+				IsSelfSigned: true,
+				IsOQS:        true,
+				OQSAlgorithm: oqsAlgorithm,
+				IsDualUse:    dualUse,
+			}
+			pkiCaLog.Infof("Using OQS algorithm: %s", oqsAlgorithm)
+		} else {
+			options = util.CertOptions{
 				TTL:          caCertTTL,
 				Org:          org,
 				IsCA:         true,
@@ -173,33 +197,54 @@ func NewSelfSignedIstioCAOptions(ctx context.Context,
 				RSAKeySize:   caRSAKeySize,
 				IsDualUse:    dualUse,
 			}
-			pemCert, pemKey, ckErr := util.GenCertKeyFromOptions(options)
-			if ckErr != nil {
-				pkiCaLog.Warnf("unable to generate CA cert and key for self-signed CA (%v)", ckErr)
-				return fmt.Errorf("unable to generate CA cert and key for self-signed CA (%v)", ckErr)
-			}
-
-			rootCerts, err := util.AppendRootCerts(pemCert, rootCertFile)
-			if err != nil {
-				pkiCaLog.Warnf("failed to append root certificates (%v)", err)
-				return fmt.Errorf("failed to append root certificates (%v)", err)
-			}
-			if caOpts.KeyCertBundle, err = util.NewVerifiedKeyCertBundleFromPem(pemCert, pemKey, nil, rootCerts); err != nil {
-				pkiCaLog.Warnf("failed to create CA KeyCertBundle (%v)", err)
-				return fmt.Errorf("failed to create CA KeyCertBundle (%v)", err)
-			}
-			// Write the key/cert back to secret, so they will be persistent when CA restarts.
-			secret := BuildSecret(caCertName, namespace, nil, nil, pemCert, pemCert, pemKey, istioCASecretType)
-			_, err = client.Secrets(namespace).Create(context.TODO(), secret, metav1.CreateOptions{})
-			if err != nil {
-				pkiCaLog.Warnf("Failed to create secret %s (%v)", caCertName, err)
-				return err
-			}
-			pkiCaLog.Infof("Using self-generated public key: %v", string(rootCerts))
-			return nil
 		}
-		return err
+
+		// Generate certificate
+		var pemCert, pemKey []byte
+		var ckErr error
+		if useOQS {
+			pemCert, pemKey, ckErr = util.GenOQSCertKeyFromOptions(options)
+		} else {
+			pemCert, pemKey, ckErr = util.GenCertKeyFromOptions(options)
+		}
+		if ckErr != nil {
+			pkiCaLog.Warnf("unable to generate CA cert and key (%v)", ckErr)
+			return fmt.Errorf("unable to generate CA cert and key (%v)", ckErr)
+		}
+
+		rootCerts, err := util.AppendRootCerts(pemCert, rootCertFile)
+		if err != nil {
+			pkiCaLog.Warnf("failed to append root certificates (%v)", err)
+			return fmt.Errorf("failed to append root certificates (%v)", err)
+		}
+
+		if caOpts.KeyCertBundle, err = util.NewVerifiedKeyCertBundleFromPem(pemCert, pemKey, nil, rootCerts); err != nil {
+			pkiCaLog.Warnf("failed to create CA KeyCertBundle (%v)", err)
+			return fmt.Errorf("failed to create CA KeyCertBundle (%v)", err)
+		}
+
+		// Create the secret
+		secret := BuildSecret(caCertName, namespace, nil, nil, pemCert, pemCert, pemKey, istioCASecretType)
+		if useOQS {
+			// Add OQS specific annotations
+			secret.ObjectMeta.Annotations = map[string]string{
+				"istio.io/signature-algorithm": oqsAlgorithm,
+			}
+		}
+
+		if _, err = client.Secrets(namespace).Create(context.TODO(), secret, metav1.CreateOptions{}); err != nil {
+			pkiCaLog.Warnf("Failed to create secret %s (%v)", caCertName, err)
+			return err
+		}
+
+		if useOQS {
+			pkiCaLog.Infof("Using self-generated OQS key with algorithm %s", oqsAlgorithm)
+		} else {
+			pkiCaLog.Infof("Using self-generated RSA key")
+		}
+		return nil
 	})
+
 	caOpts.RotatorConfig.secretName = caCertName
 	return caOpts, err
 }

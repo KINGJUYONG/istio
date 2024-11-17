@@ -70,9 +70,9 @@ func (s *Server) CreateOQSCertificate(ctx context.Context, request *pb.IstioCert
 		respCertChain, signErr = s.ca.SignWithCertChain([]byte(request.Csr), certOpts)
 	}
 	if signErr != nil {
-		serverCaLog.Errorf("CSR signing error: %v", signErr.Error())
+		serverCaLog.Errorf("(OQS)CSR signing error: %v", signErr.Error())
 		s.monitoring.GetCertSignError(signErr.(*caerror.Error).ErrorType()).Increment()
-		return nil, status.Errorf(signErr.(*caerror.Error).HTTPErrorCode(), "CSR signing error (%v)", signErr.(*caerror.Error))
+		return nil, status.Errorf(signErr.(*caerror.Error).HTTPErrorCode(), "(oqsret)CSR signing error (%v)", signErr.(*caerror.Error))
 	}
 	if certSigner == "" {
 		respCertChain = []string{string(cert)}

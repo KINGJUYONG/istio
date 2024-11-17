@@ -27,6 +27,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"crypto/x509/pkix"
+	"encoding/asn1"
 	"encoding/pem"
 	"errors"
 	"fmt"
@@ -35,6 +36,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/open-quantum-safe/liboqs-go/oqs"
 	"istio.io/istio/pkg/log"
 )
 
@@ -114,6 +116,10 @@ type CertOptions struct {
 
 	// Subjective Alternative Name values.
 	DNSNames string
+
+	// For OQS
+	IsOQS        bool
+	OQSAlgorithm string
 }
 
 // GenCertKeyFromOptions generates a X.509 certificate and a private key with the given options.
@@ -458,6 +464,21 @@ func encodePem(isCSR bool, csrOrCert []byte, priv any, pkcs8 bool) (
 				return nil, nil, err
 			}
 			privPem = pem.EncodeToMemory(&pem.Block{Type: blockTypeECPrivateKey, Bytes: encodedKey})
+		case *oqs.Signature:
+			oqsKeyData := struct {
+				SecretKey []byte
+			}{
+				SecretKey: k.ExportSecretKey(),
+			}
+
+			encodedKey, err = asn1.Marshal(oqsKeyData)
+			if err != nil {
+				return nil, nil, fmt.Errorf("failed to marshal OQS secret key: %v", err)
+			}
+			privPem = pem.EncodeToMemory(&pem.Block{
+				Type:  "OQS PRIVATE KEY",
+				Bytes: encodedKey,
+			})
 		default:
 			return nil, nil, fmt.Errorf("unsupported private key type: %T", priv)
 		}

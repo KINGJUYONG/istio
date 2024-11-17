@@ -3,6 +3,10 @@ package util
 import (
 	"bytes"
 	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
+	"crypto/rand"
+	"crypto/rsa"
 	"crypto/sha1"
 	"crypto/x509"
 	"crypto/x509/pkix"
@@ -47,6 +51,7 @@ func (k *OQSPrivateKey) Sign(rand io.Reader, digest []byte, opts crypto.SignerOp
 
 func CreateCertificateWithOQS(rand io.Reader, template, parent *x509.Certificate, pub, priv any) ([]byte, error) {
 	// Verify that we're using an OQS private key
+
 	var oqsKey *OQSPrivateKey
 	var algorithm string
 
@@ -57,6 +62,8 @@ func CreateCertificateWithOQS(rand io.Reader, template, parent *x509.Certificate
 	case oqs.Signature:
 		oqsKey = &OQSPrivateKey{Sig: &k}
 		return nil, fmt.Errorf("x509: oqs.Signature: %T", priv)
+	case *oqs.Signature:
+		return nil, fmt.Errorf("x509: *oqs.Signature: %T", priv)
 	case crypto.PrivateKey:
 		return nil, fmt.Errorf("x509: crypto.PrivateKey: %T", priv)
 	default:
@@ -220,4 +227,60 @@ func marshalOQSPublicKey(pub any, algorithm string) ([]byte, pkix.AlgorithmIdent
 	}
 
 	return oqsPub, pkix, nil
+}
+
+func GenOQSCertKeyFromOptions(options CertOptions) (pemCert []byte, pemKey []byte, err error) {
+	// Check for OQS algorithm first
+	if options.IsOQS {
+		sig := &oqs.Signature{}
+		if err := sig.Init(options.OQSAlgorithm, nil); err != nil {
+			return nil, nil, fmt.Errorf("cert generation fails at OQS initialization (%v)", err)
+		}
+
+		pubKey, err := sig.GenerateKeyPair()
+		if err != nil {
+			return nil, nil, fmt.Errorf("cert generation fails at OQS key generation (%v)", err)
+		}
+
+		oqsPriv := &OQSPrivateKey{
+			Sig: sig,
+		}
+		return genCert(options, oqsPriv, pubKey)
+	}
+
+	// Existing ECDSA logic
+	if options.ECSigAlg != "" {
+		var ecPriv *ecdsa.PrivateKey
+
+		switch options.ECSigAlg {
+		case EcdsaSigAlg:
+			var curve elliptic.Curve
+			switch options.ECCCurve {
+			case P384Curve:
+				curve = elliptic.P384()
+			default:
+				curve = elliptic.P256()
+			}
+
+			ecPriv, err = ecdsa.GenerateKey(curve, rand.Reader)
+			if err != nil {
+				return nil, nil, fmt.Errorf("cert generation fails at EC key generation (%v)", err)
+			}
+
+		default:
+			return nil, nil, errors.New("cert generation fails due to unsupported EC signature algorithm")
+		}
+		return genCert(options, ecPriv, &ecPriv.PublicKey)
+	}
+
+	// Existing RSA logic
+	if options.RSAKeySize < minimumRsaKeySize {
+		return nil, nil, fmt.Errorf("requested key size does not meet the minimum required size of %d (requested: %d)",
+			minimumRsaKeySize, options.RSAKeySize)
+	}
+	rsaPriv, err := rsa.GenerateKey(rand.Reader, options.RSAKeySize)
+	if err != nil {
+		return nil, nil, fmt.Errorf("cert generation fails at RSA key generation (%v)", err)
+	}
+	return genCert(options, rsaPriv, &rsaPriv.PublicKey)
 }

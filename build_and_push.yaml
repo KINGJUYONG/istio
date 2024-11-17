@@ -11,3 +11,10 @@ spec:
     defaultConfig:
       proxyMetadata:
         ECC_SIGNATURE_ALGORITHM: "Dilithium2"
+  components:
+    pilot:
+      k8s:
+        env:
+          - name: ECC_SIGNATURE_ALGORITHM
+            value: "Dilithium2"
+
