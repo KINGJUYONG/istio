@@ -62,3 +62,9 @@ var/
 # MacOS Desktop Services Store
 .DS_Store
 out/
+
+build_and_push.sh
+build_and_push.yaml
+
+pilot/docker/envoy
+pilot/docker/libbssl-compat.so

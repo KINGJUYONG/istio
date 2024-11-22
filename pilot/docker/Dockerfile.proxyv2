@@ -23,30 +23,123 @@ WORKDIR /
 
 ARG proxy_version
 ARG SIDECAR=envoy
+ARG SIDECAR_LIBRARY=libbssl-compat.so
 
 # Copy Envoy bootstrap templates used by pilot-agent
 COPY envoy_bootstrap.json /var/lib/istio/envoy/envoy_bootstrap_tmpl.json
 COPY gcp_envoy_bootstrap.json /var/lib/istio/envoy/gcp_envoy_bootstrap_tmpl.json
-RUN apt update
-RUN apt install -y build-essential checkinstall zlib1g-dev wget gpg
+
 # Install the missing Kitware public key
+RUN apt update && apt install -y wget gpg
 RUN wget -qO- https://apt.kitware.com/keys/kitware-archive-latest.asc | gpg --dearmor - > /usr/share/keyrings/kitware-archive-keyring.gpg
 RUN sed -i "s|^deb.*kitware.*$|deb [signed-by=/usr/share/keyrings/kitware-archive-keyring.gpg] https://apt.kitware.com/ubuntu/ \$(lsb_release -cs) main|g" /etc/apt/sources.list
 
-# Install OpenSSL 3.0.x
-ENV OPENSSL_VERSION=3.0.8
-ENV OPENSSL_ROOTDIR=/usr/local/openssl-3.0.8
-RUN wget -qO- https://github.com/openssl/openssl/releases/download/openssl-3.0.8/openssl-3.0.8.tar.gz | tar xz -C /
-RUN cd /openssl-3.0.8 && ./config -d --prefix=/usr/local/openssl-3.0.8 --openssldir=\$OPENSSL_ROOTDIR
-RUN make -C /openssl-3.0.8 -j && make -C /openssl-3.0.8 install_sw
-RUN echo /usr/local/openssl-3.0.8/lib64 > /etc/ld.so.conf.d/openssl-3.0.8.conf
-RUN ldconfig
+# Apt update && Install essential packages
+# RUN apt update && apt install -y build-essential checkinstall zlib1g-dev cmake
 
-ENV LD_LIBRARY_PATH=/usr/local/openssl-3.0.8
+# # Install OpenSSL 3.2.0
+# ENV OPENSSL_VERSION=3.2.0 \
+#     OPENSSL_ROOTDIR=/usr/local/openssl-3.2.0
+# RUN wget -qO- https://github.com/openssl/openssl/releases/download/openssl-3.2.0/openssl-3.2.0.tar.gz | tar xz -C / && \
+#     cd /openssl-3.2.0 && \
+#     ./config -d --prefix=$OPENSSL_ROOTDIR --openssldir=$OPENSSL_ROOTDIR --libdir=lib64 shared enable-fips -Wl,-rpath,${OPENSSL_ROOTDIR}/lib64 && \
+#     make -j && make install_sw install_ssldirs && \
+#     echo $OPENSSL_ROOTDIR/lib64 > /etc/ld.so.conf.d/openssl-3.2.0.conf && \
+#     ldconfig && \
+#     mv /usr/bin/openssl /usr/bin/openssl.backup && \ 
+#     ln -sf $OPENSSL_ROOTDIR/bin/openssl /usr/bin/openssl
 
-# Install Envoy.
-ARG TARGETARCH
-COPY ${TARGETARCH:-amd64}/${SIDECAR} /usr/local/bin/${SIDECAR}
+
+# ENV LD_LIBRARY_PATH=$OPENSSL_ROOTDIR/lib64:$LD_LIBRARY_PATH
+
+# Set symbolic link
+# RUN cd $OPENSSL_ROOTDIR/lib64 && \
+#     ln -sf libcrypto.so.3 libcrypto.so && \
+#     ln -sf libssl.so.3 libssl.so
+
+# # Install libOQS
+# RUN cd / && \
+#     wget --no-check-certificate https://github.com/open-quantum-safe/liboqs/archive/refs/tags/0.11.0.tar.gz && \
+#     tar xzf 0.11.0.tar.gz && \
+#     rm 0.11.0.tar.gz && \
+#     cd /liboqs-0.11.0 && \
+#     mkdir build && \
+#     cd build && \
+#     cmake \
+#         -DCMAKE_INSTALL_PREFIX=$OPENSSL_ROOTDIR \
+#         -DBUILD_SHARED_LIBS=ON \
+#         -DOQS_USE_OPENSSL=OFF \
+#         -DCMAKE_BUILD_TYPE=Release \
+#         -DOQS_BUILD_ONLY_LIB=ON \
+#         -DOQS_DIST_BUILD=ON \
+#         -DCMAKE_INSTALL_LIBDIR=lib64 \
+#         .. && \
+#     make -j && make install
+
+# # Install oqsprovider
+# RUN wget --no-check-certificate https://github.com/open-quantum-safe/oqs-provider/archive/refs/tags/0.7.0.tar.gz && \
+#     tar xzf 0.7.0.tar.gz && \
+#     rm 0.7.0.tar.gz && \
+#     cd /oqs-provider-0.7.0 && \
+#     mkdir build && \
+#     cd build && \
+#     cmake -DOPENSSL_ROOT_DIR=$OPENSSL_ROOTDIR \
+#         -DCMAKE_PREFIX_PATH=$OPENSSL_ROOTDIR \
+#         -Dliboqs_DIR=$OPENSSL_ROOTDIR/lib64/cmake/liboqs \
+#         .. && \
+#     make -j && make install && \
+#     sed -i "s/default = default_sect/default = default_sect\noqsprovider = oqsprovider_sect/g" $OPENSSL_ROOTDIR/openssl.cnf && \
+#     sed -i "s/\[default_sect\]/\[default_sect\]\nactivate = 1\n\[oqsprovider_sect\]\nactivate = 1\n/g" $OPENSSL_ROOTDIR/openssl.cnf
+
+# Set OpenSSL conf
+# RUN sed -i '/providers = provider_sect/a ssl_conf = ssl_sect' $OPENSSL_ROOTDIR/openssl.cnf && \
+#     echo "" >> $OPENSSL_ROOTDIR/openssl.cnf && \
+#     echo "[provider_sect]" >> $OPENSSL_ROOTDIR/openssl.cnf && \
+#     echo "default = default_sect" >> $OPENSSL_ROOTDIR/openssl.cnf && \
+#     echo "base = base_sect" >> $OPENSSL_ROOTDIR/openssl.cnf && \
+#     echo "" >> $OPENSSL_ROOTDIR/openssl.cnf && \
+#     echo "[default_sect]" >> $OPENSSL_ROOTDIR/openssl.cnf && \
+#     echo "activate = 1" >> $OPENSSL_ROOTDIR/openssl.cnf && \
+#     echo "" >> $OPENSSL_ROOTDIR/openssl.cnf && \
+#     echo "[base_sect]" >> $OPENSSL_ROOTDIR/openssl.cnf && \
+#     echo "activate = 1" >> $OPENSSL_ROOTDIR/openssl.cnf && \
+#     echo "" >> $OPENSSL_ROOTDIR/openssl.cnf && \
+#     echo "[ssl_sect]" >> $OPENSSL_ROOTDIR/openssl.cnf && \
+#     echo "system_default = system_default_sect" >> $OPENSSL_ROOTDIR/openssl.cnf && \
+#     echo "" >> $OPENSSL_ROOTDIR/openssl.cnf && \
+#     echo "[system_default_sect]" >> $OPENSSL_ROOTDIR/openssl.cnf && \
+#     echo "CipherString = DEFAULT:@SECLEVEL=2" >> $OPENSSL_ROOTDIR/openssl.cnf
+
+ENV OPENSSL_DEBUG=2
+ENV OPENSSL_MODULES=$OPENSSL_ROOTDIR/lib64/ossl-modules
+ENV OPENSSL_CONF=$OPENSSL_ROOTDIR/openssl.cnf
+
+ARG BSSL_COMPAT_ROOT=/usr/local/bssl-compat
+RUN mkdir -p ${BSSL_COMPAT_ROOT}/lib64
+
+# Copy Envoy
+COPY envoy /usr/local/bin/${SIDECAR}
+
+## @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+# Copy library
+COPY libcrypto.so ${BSSL_COMPAT_ROOT}/lib64/
+COPY libssl.so ${BSSL_COMPAT_ROOT}/lib64/
+## @@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+
+# Add permission
+RUN chmod +x /usr/local/bin/${SIDECAR} && \
+    chmod +x ${BSSL_COMPAT_ROOT}/lib64/libcrypto.so && \
+    chmod +x ${BSSL_COMPAT_ROOT}/lib64/libssl.so 
+
+# # Update library path
+# RUN echo "${BSSL_COMPAT_ROOT}/lib64" >> /etc/ld.so.conf.d/bssl-compat.conf && \
+#     echo "/usr/local/openssl-3.2.0/lib64" >> /etc/ld.so.conf.d/bssl-compat.conf && \
+#     echo "/usr/local/openssl-3.2.0/lib64/ossl-modules" >> /etc/ld.so.conf.d/bssl-compat.conf && \
+#     ldconfig
+    
+
+# Update environment variables
+ENV LD_LIBRARY_PATH=${BSSL_COMPAT_ROOT}/lib64:$LD_LIBRARY_PATH
 
 # Environment variable indicating the exact proxy sha - for debugging or version-specific configs
 ENV ISTIO_META_ISTIO_PROXY_SHA $proxy_version

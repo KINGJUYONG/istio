@@ -17,12 +17,13 @@ package utils
 import (
 	"context"
 	"fmt"
+	"strings"
+
 	tls "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/v3"
 	"istio.io/istio/pkg/log"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"strings"
 
 	meshconfig "istio.io/api/mesh/v1alpha1"
 	"istio.io/istio/pilot/pkg/features"
@@ -78,7 +79,7 @@ func BuildInboundTLS(mTLSMode model.MutualTLSMode, node *model.Proxy,
 	}
 
 	ciphers := SupportedCiphers
-	log.Info("TLS Default Called")
+
 	if mc != nil && mc.MeshMTLS != nil && mc.MeshMTLS.CipherSuites != nil {
 		ciphers = mc.MeshMTLS.CipherSuites
 	}
@@ -90,7 +91,7 @@ func BuildInboundTLS(mTLSMode model.MutualTLSMode, node *model.Proxy,
 	if err != nil || annoCipher == nil {
 		log.Debug("No Annotation Cipher Detected")
 	} else {
-		log.Info("Annotation Overriding Triggered")
+		log.Infof("Annotation Overriding Triggered : %s", annoCipher)
 		ciphers = annoCipher
 	}
 
@@ -99,7 +100,7 @@ func BuildInboundTLS(mTLSMode model.MutualTLSMode, node *model.Proxy,
 	ctx.CommonTlsContext.TlsParams = &tls.TlsParameters{
 		CipherSuites:              ciphers,
 		TlsMinimumProtocolVersion: minTLSVersion,
-		TlsMaximumProtocolVersion: tls.TlsParameters_TLSv1_2,
+		TlsMaximumProtocolVersion: tls.TlsParameters_TLSv1_3,
 	}
 
 	log.Infof("TLS Params: %+v", ctx.CommonTlsContext.TlsParams)
@@ -113,7 +114,7 @@ func getCiphersuitesFromAnnoation(node *model.Proxy) ([]string, error) {
 	var err error
 	// Configure the ciphersuites from pod annotation by querying to k8s API Server
 	k8sConfig, err := rest.InClusterConfig()
-
+	log.Infof("Entry to get Ciphersuites From Annotation")
 	if err != nil {
 		return nil, fmt.Errorf("error triggered when fetching k8s config file")
 	}
@@ -135,27 +136,22 @@ func getCiphersuitesFromAnnoation(node *model.Proxy) ([]string, error) {
 		if key == "cipherSuites" {
 			cipherSuitesFromPodAnnos = append(cipherSuitesFromPodAnnos, values)
 		}
-		log.Infof("%s, %s", key, values)
 	}
 	for key, values := range namespace.Annotations {
 		if key == "cipherSuites" {
 			ciphersuitesFromNSAnnos = append(ciphersuitesFromNSAnnos, values)
 		}
-		log.Infof("%s, %s", key, values)
 	}
 
 	// this function doesn't validate ciphersuites, if it needs, then use FilterCiphersuites()
 	var ret []string
 	if cipherSuitesFromPodAnnos != nil {
-		log.Infof("ret = podAnnos")
 		ret = cipherSuitesFromPodAnnos
 	}
 	if ciphersuitesFromNSAnnos != nil {
-		log.Infof("ret = NSAnnos")
 		ret = ciphersuitesFromNSAnnos
 	}
 
-	log.Infof("getCipherSuitesFromAnnos ret: %+v", ret)
 	return ret, err
 }
 
@@ -164,7 +160,7 @@ func getCiphersuitesFromAnnoation(node *model.Proxy) ([]string, error) {
 func GetMinTLSVersion(ver meshconfig.MeshConfig_TLSConfig_TLSProtocol) tls.TlsParameters_TlsProtocol {
 	switch ver {
 	case meshconfig.MeshConfig_TLSConfig_TLSV1_3:
-		return tls.TlsParameters_TLSv1_2
+		return tls.TlsParameters_TLSv1_3
 	default:
 		return tls.TlsParameters_TLSv1_2
 	}
