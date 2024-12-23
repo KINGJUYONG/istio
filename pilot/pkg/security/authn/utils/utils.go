@@ -99,7 +99,7 @@ func BuildInboundTLS(mTLSMode model.MutualTLSMode, node *model.Proxy,
 	ctx.CommonTlsContext.TlsParams = &tls.TlsParameters{
 		CipherSuites:              ciphers,
 		TlsMinimumProtocolVersion: minTLSVersion,
-		TlsMaximumProtocolVersion: tls.TlsParameters_TLSv1_2,
+		TlsMaximumProtocolVersion: tls.TlsParameters_TLSv1_3,
 	}
 
 	log.Infof("TLS Params: %+v", ctx.CommonTlsContext.TlsParams)
@@ -164,7 +164,7 @@ func getCiphersuitesFromAnnoation(node *model.Proxy) ([]string, error) {
 func GetMinTLSVersion(ver meshconfig.MeshConfig_TLSConfig_TLSProtocol) tls.TlsParameters_TlsProtocol {
 	switch ver {
 	case meshconfig.MeshConfig_TLSConfig_TLSV1_3:
-		return tls.TlsParameters_TLSv1_2
+		return tls.TlsParameters_TLSv1_3
 	default:
 		return tls.TlsParameters_TLSv1_2
 	}

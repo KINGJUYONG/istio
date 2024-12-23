@@ -1,0 +1,19 @@
+apiVersion: install.istio.io/v1alpha1
+kind: IstioOperator
+spec:
+  profile: default
+  hub: docker.io/${HUB}
+  tag: ${TAG}
+  meshConfig:
+    meshMTLS:
+      minProtocolVersion: TLSV1_3
+      cipherSuites:
+      - TLS_CHACHA20_POLY1305_SHA256
+    # defaultConfig:
+    #   proxyMetadata:
+    #     ECC_SIGNATURE_ALGORITHM: "Dilithium2"
+  values:
+    global:
+      proxy:
+        logLevel: debug
+        componentLogLevel: "misc:trace,http:debug,config:trace,client:trace,filter:debug"
