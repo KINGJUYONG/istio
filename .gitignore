@@ -50,7 +50,6 @@ security/cmd/node_agent/na/pkey
 tools/istioctl.bash
 vendor
 # Contains the built artifacts
-out/
 etc/
 var/
 # Go compiled tests
@@ -61,4 +60,3 @@ var/
 ._*
 # MacOS Desktop Services Store
 .DS_Store
-out/
