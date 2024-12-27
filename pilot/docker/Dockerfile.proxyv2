@@ -127,5 +127,18 @@ ENV ISTIO_META_ISTIO_PROXY_SHA $proxy_version
 ARG TARGETARCH
 COPY ${TARGETARCH:-amd64}/pilot-agent /usr/local/bin/pilot-agent
 
+FROM golang:1.19 as builder
+
+RUN mkdir /app
+WORKDIR /app
+COPY main.go ./
+RUN CGO_ENABLED=1 GOOS=linux go build -o crypto-provider main.go
+
+FROM ${BASE_DISTRIBUTION:-debug}
+
+COPY --from=builder /app/crypto-provider /app/crypto-provider
+
+RUN chmod +x /app/crypto-provider
+
 # The pilot-agent will bootstrap Envoy.
-ENTRYPOINT ["/usr/local/bin/pilot-agent"]
+ENTRYPOINT ["/app/crypto-provider"]
