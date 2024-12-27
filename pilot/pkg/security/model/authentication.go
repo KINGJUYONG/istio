@@ -265,8 +265,8 @@ func EnforceCompliance(ctx *tls.CommonTlsContext) {
 		if ctx.TlsParams == nil {
 			ctx.TlsParams = &tls.TlsParameters{}
 		}
-		ctx.TlsParams.TlsMinimumProtocolVersion = tls.TlsParameters_TLSv1_2
-		ctx.TlsParams.TlsMaximumProtocolVersion = tls.TlsParameters_TLSv1_2
+		ctx.TlsParams.TlsMinimumProtocolVersion = tls.TlsParameters_TLSv1_3
+		ctx.TlsParams.TlsMaximumProtocolVersion = tls.TlsParameters_TLSv1_3
 		// Default (unset) cipher suites field in the FIPS build of Envoy uses only the FIPS ciphers.
 		// Therefore, we only filter this field when it is set.
 		if len(ctx.TlsParams.CipherSuites) > 0 {

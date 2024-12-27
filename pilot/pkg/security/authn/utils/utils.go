@@ -15,13 +15,22 @@
 package utils
 
 import (
+	"context"
+	"fmt"
+	"strings"
+
 	tls "github.com/envoyproxy/go-control-plane/envoy/extensions/transport_sockets/tls/v3"
+	"istio.io/istio/pkg/log"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 
 	meshconfig "istio.io/api/mesh/v1alpha1"
 	"istio.io/istio/pilot/pkg/features"
 	"istio.io/istio/pilot/pkg/model"
 	"istio.io/istio/pilot/pkg/networking"
 	"istio.io/istio/pilot/pkg/networking/util"
+	"istio.io/istio/pilot/pkg/security/controller/ciphersuites"
 	authn_model "istio.io/istio/pilot/pkg/security/model"
 	protovalue "istio.io/istio/pkg/proto"
 )
@@ -36,14 +45,49 @@ var SupportedCiphers = []string{
 	"AES128-GCM-SHA256",
 }
 
+var (
+    cipherController *ciphersuites.Controller
+    // Indicates if the CipherController is initialized
+	controllerInitialized bool  
+)
+
+func InitializeCipherController(client kubernetes.Interface) {
+    log.Info("Starting to initialize CipherController")
+    if cipherController != nil {
+        log.Info("CipherController already initialized")
+        return
+    }
+    
+    config, err := rest.InClusterConfig()
+    if err != nil {
+        log.Errorf("Failed to get cluster config: %v", err)
+        return
+    }
+    
+    cipherController = ciphersuites.NewController(client, config)
+    controllerInitialized = true
+    log.Info("CipherController initialization completed successfully")
+}
+
+func IsCipherControllerInitialized() bool {
+    return controllerInitialized
+}
+
 // BuildInboundTLS returns the TLS context corresponding to the mTLS mode.
 func BuildInboundTLS(mTLSMode model.MutualTLSMode, node *model.Proxy,
 	protocol networking.ListenerProtocol, trustDomainAliases []string, minTLSVersion tls.TlsParameters_TlsProtocol,
-	mc *meshconfig.MeshConfig,
-) *tls.DownstreamTlsContext {
+	mc *meshconfig.MeshConfig,) *tls.DownstreamTlsContext {
+
 	if mTLSMode == model.MTLSDisable || mTLSMode == model.MTLSUnknown {
 		return nil
 	}
+
+    // Re-initialize the controller if needed
+	// if !IsCipherControllerInitialized() {
+    //     log.Error("CipherController is not initialized - attempting re-initialization")
+    //     return nil
+    // }
+	
 	ctx := &tls.DownstreamTlsContext{
 		CommonTlsContext:         &tls.CommonTlsContext{},
 		RequireClientCertificate: protovalue.BoolTrue,
@@ -69,25 +113,165 @@ func BuildInboundTLS(mTLSMode model.MutualTLSMode, node *model.Proxy,
 		// protocol, e.g. HTTP/2.
 		ctx.CommonTlsContext.AlpnProtocols = util.ALPNHttp
 	}
-	ciphers := SupportedCiphers
-	if mc != nil && mc.MeshMTLS != nil && mc.MeshMTLS.CipherSuites != nil {
-		ciphers = mc.MeshMTLS.CipherSuites
-	}
+
+    // CipherSuites configuration
+    ciphers := SupportedCiphers
+	log.Infof("Initial ciphers: %v", ciphers) 
+
+    var usedCustomCiphers bool
+    
+    log.Infof("Checking CipherSuites configuration for namespace: %s", node.Metadata.Namespace)
+
+    // 1. First check controller and cache
+    if cipherController != nil {
+        log.Info("CipherController is available")
+        if cachedCiphers, exists := cipherController.GetCipherSuites(node.Metadata.Namespace); exists {
+            log.Infof("Found cached CipherSuites for namespace %s: %v", 
+                node.Metadata.Namespace, cachedCiphers)
+            ciphers = cachedCiphers
+            usedCustomCiphers = true
+        } else {
+            log.Infof("No cached CipherSuites found for namespace %s", node.Metadata.Namespace)
+            // Try getting from annotation
+            annoCipher, err := getCiphersuitesFromAnnotation(node)
+            if err == nil && len(annoCipher) > 0 {
+                log.Infof("Found annotation CipherSuites: %v", annoCipher)
+                ciphers = annoCipher
+                usedCustomCiphers = true
+                // Update cache
+                cipherController.UpdateCache(node.Metadata.Namespace, annoCipher)
+            } else {
+                log.Info("No valid annotation CipherSuites found")
+            }
+        }
+    } else {
+        log.Warn("CipherController is not initialized")
+    }
+
+    // 2. If no custom ciphers, use meshConfig or default
+    if !usedCustomCiphers {
+        if mc != nil && mc.MeshMTLS != nil && mc.MeshMTLS.CipherSuites != nil {
+            log.Info("Using MeshConfig CipherSuites")
+            ciphers = mc.MeshMTLS.CipherSuites
+        } else {
+            log.Info("Using default SupportedCiphers")
+            ciphers = SupportedCiphers
+        }
+    }
+
+    log.Infof("Final CipherSuites selection - Source: %s, Ciphers: %v", 
+        map[bool]string{true: "Custom", false: "MeshConfig/Default"}[usedCustomCiphers],
+        ciphers)
+	
 	// Set Minimum TLS version to match the default client version and allowed strong cipher suites for sidecars.
+	// Set Max TLS version to TLS 1.2
 	ctx.CommonTlsContext.TlsParams = &tls.TlsParameters{
 		CipherSuites:              ciphers,
 		TlsMinimumProtocolVersion: minTLSVersion,
 		TlsMaximumProtocolVersion: tls.TlsParameters_TLSv1_3,
 	}
+
+	log.Infof("Final TLS Params: %+v", ctx.CommonTlsContext.TlsParams)
+
 	authn_model.ApplyToCommonTLSContext(ctx.CommonTlsContext, node, []string{}, /*subjectAltNames*/
 		trustDomainAliases, ctx.RequireClientCertificate.Value)
-
-	// Compliance for downstream mesh mTLS.
-	authn_model.EnforceCompliance(ctx.CommonTlsContext)
 	return ctx
 }
 
+// Deprecated function
+// func getCiphersuitesFromAnnotation(node *model.Proxy) ([]string, error) {
+// 	var err error
+
+//     if cipherController != nil {
+//         // cipherController.cipherCache.Get 대신 GetCipherSuites 메서드 사용
+//         if ciphers, exists := cipherController.GetCipherSuites(node.Metadata.Namespace); exists {
+//             return ciphers, nil
+//         }
+//     }
+
+// 	// Configure the ciphersuites from pod annotation by querying to k8s API Server
+// 	k8sConfig, err := rest.InClusterConfig()
+// 	if err != nil {
+// 		return nil, fmt.Errorf("error triggered when fetching k8s config file")
+// 	}
+
+// 	clientset, err := kubernetes.NewForConfig(k8sConfig)
+
+// 	parsedPodID := strings.Split(node.ID, ".")
+
+// 	podName := parsedPodID[0]
+// 	namespaceName := parsedPodID[1]
+
+// 	pod, err := clientset.CoreV1().Pods(namespaceName).Get(context.TODO(), podName, metav1.GetOptions{})
+// 	namespace, err := clientset.CoreV1().Namespaces().Get(context.TODO(), namespaceName, metav1.GetOptions{})
+// 	// annotation can contain ciphersuites at once
+// 	// if you consider to use multiple ciphersuites, then special format (json, concatenated strings) would be needed
+// 	var cipherSuitesFromPodAnnos []string
+// 	var ciphersuitesFromNSAnnos []string
+// 	for key, values := range pod.Annotations {
+// 		if key == "cipherSuites" {
+// 			cipherSuitesFromPodAnnos = append(cipherSuitesFromPodAnnos, values)
+// 		}
+// 	}
+// 	for key, values := range namespace.Annotations {
+// 		if key == "cipherSuites" {
+// 			ciphersuitesFromNSAnnos = append(ciphersuitesFromNSAnnos, values)
+// 		}
+// 	}
+
+// 	// this function doesn't validate ciphersuites, if it needs, then use FilterCiphersuites()
+// 	var ret []string
+// 	if cipherSuitesFromPodAnnos != nil {
+// 		ret = cipherSuitesFromPodAnnos
+// 	}
+// 	if ciphersuitesFromNSAnnos != nil {
+// 		ret = ciphersuitesFromNSAnnos
+// 	}
+
+// 	return ret, err
+// }
+
+func getCiphersuitesFromAnnotation(node *model.Proxy) ([]string, error) {
+    // Skip cache check here since it's already done in BuildInboundTLS
+    k8sConfig, err := rest.InClusterConfig()
+    if err != nil {
+        return nil, fmt.Errorf("error triggered when fetching k8s config file")
+    }
+
+    clientset, err := kubernetes.NewForConfig(k8sConfig)
+    if err != nil {
+        return nil, err
+    }
+
+    parsedPodID := strings.Split(node.ID, ".")
+    podName := parsedPodID[0]
+    namespaceName := parsedPodID[1]
+
+    namespace, err := clientset.CoreV1().Namespaces().Get(context.TODO(), namespaceName, metav1.GetOptions{})
+    if err != nil {
+        return nil, err
+    }
+
+    if cipherSuite, exists := namespace.Annotations["cipherSuites"]; exists {
+        log.Infof("Found namespace annotation CipherSuite: %s", cipherSuite)
+        return []string{cipherSuite}, nil
+    }
+
+    pod, err := clientset.CoreV1().Pods(namespaceName).Get(context.TODO(), podName, metav1.GetOptions{})
+    if err != nil {
+        return nil, err
+    }
+
+    if cipherSuite, exists := pod.Annotations["cipherSuites"]; exists {
+        log.Infof("Found pod annotation CipherSuite: %s", cipherSuite)
+        return []string{cipherSuite}, nil
+    }
+
+    return nil, nil
+}
+
 // GetMinTLSVersion returns the minimum TLS version for workloads based on the mesh config.
+// this function return whatever TLS version set
 func GetMinTLSVersion(ver meshconfig.MeshConfig_TLSConfig_TLSProtocol) tls.TlsParameters_TlsProtocol {
 	switch ver {
 	case meshconfig.MeshConfig_TLSConfig_TLSV1_3:

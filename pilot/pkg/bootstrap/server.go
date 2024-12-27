@@ -43,6 +43,7 @@ import (
 	"istio.io/istio/pilot/pkg/keycertbundle"
 	"istio.io/istio/pilot/pkg/model"
 	sec_model "istio.io/istio/pilot/pkg/security/model"
+	"istio.io/istio/pilot/pkg/security/authn/utils"
 	"istio.io/istio/pilot/pkg/server"
 	"istio.io/istio/pilot/pkg/serviceregistry/aggregate"
 	"istio.io/istio/pilot/pkg/serviceregistry/provider"
@@ -257,6 +258,12 @@ func NewServer(args *PilotArgs, initFuncs ...func(*Server)) (*Server, error) {
 	if err := s.initKubeClient(args); err != nil {
 		return nil, fmt.Errorf("error initializing kube client: %v", err)
 	}
+
+	// add CipherController initialization
+	log.Info("Initializing CipherSuite Controller")
+	// Get K8s client from Istio client
+	kClient := s.kubeClient.Kube()
+	utils.InitializeCipherController(kClient)
 
 	s.initMeshConfiguration(args, s.fileWatcher)
 	spiffe.SetTrustDomain(s.environment.Mesh().GetTrustDomain())

@@ -699,7 +699,7 @@ func buildCommonConnectTLSContext(proxy *model.Proxy, push *model.PushContext) *
 	ctx.TlsParams = &tls.TlsParameters{
 		// Ensure TLS 1.3 is used everywhere
 		TlsMaximumProtocolVersion: tls.TlsParameters_TLSv1_3,
-		TlsMinimumProtocolVersion: tls.TlsParameters_TLSv1_3,
+		TlsMinimumProtocolVersion: tls.TlsParameters_TLSv1_2,
 	}
 	// Compliance for Envoy tunnel TLS contexts.
 	security.EnforceCompliance(ctx)
